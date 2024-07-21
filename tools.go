@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -15,14 +16,14 @@ import (
 const randomStringSource = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_+"
 
 // Tools is the type used to instantiate this module. Any variable of this type will have access
-// to all the methods with the reciver *Tools.
+// to all the methods with the reciever *Tools.
 type Tools struct {
 	MaxFileSize      int
 	AllowedFileTypes []string
 }
 
-// RandomString returns a string of random characters of lenght n, using randomStringSource
-// as the source of the string.
+// RandomString returns a string of random characters of length n, using randomStringSource
+// as the source for the string.
 func (t *Tools) RandomString(n int) string {
 	s, r := make([]rune, n), []rune(randomStringSource)
 
@@ -42,7 +43,7 @@ type UploadedFile struct {
 	FileSize         int64
 }
 
-// UploadOneFile is just a convenience method that calls UploadFiles, but expects only one file
+// UploadOneFile is just a convenience method that calls UploadFiles, but expects only one file to
 // be in the upload.
 func (t *Tools) UploadOneFile(r *http.Request, uploadDir string, rename ...bool) (*UploadedFile, error) {
 	renameFile := true
@@ -58,6 +59,10 @@ func (t *Tools) UploadOneFile(r *http.Request, uploadDir string, rename ...bool)
 	return files[0], nil
 }
 
+// UploadFiles uploads one or more file to a specified directory, and gives the files a random name.
+// It returns a slice containing the newly named files, the original file names, the size of the files,
+// and potentially an error. If the optional last parameter is set to true, then we will not rename
+// the files, but will use the original file names.
 func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) ([]*UploadedFile, error) {
 	renameFile := true
 	if len(rename) > 0 {
@@ -128,7 +133,6 @@ func (t *Tools) UploadFiles(r *http.Request, uploadDir string, rename ...bool) (
 				uploadedFile.OriginalFileName = hdr.Filename
 
 				var outfile *os.File
-				// defer outfile.Close()
 				// defer file close at this point only if NOT on Windows
 				if runtime.GOOS != "windows" {
 					defer outfile.Close()
@@ -173,4 +177,19 @@ func (t *Tools) CreateDirIfNotExist(path string) error {
 	}
 
 	return nil
+}
+
+// Slugify is a very simple means of creating a slug from a string.
+func (t *Tools) Slugify(s string) (string, error) {
+	if s == "" {
+		return "", errors.New("empty string not permitted")
+	}
+
+	var re = regexp.MustCompile(`[^a-z\d]+`)
+	slug := strings.Trim(re.ReplaceAllString(strings.ToLower(s), "-"), "-")
+	if len(slug) == 0 {
+		return "", errors.New("after removing characters, slug is zero length")
+	}
+
+	return slug, nil
 }
